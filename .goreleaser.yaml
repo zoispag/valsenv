@@ -10,6 +10,11 @@ builds:
     binary: valsenv
     env:
       - CGO_ENABLED=0
+    ldflags:
+      - -s -w
+      - -X github.com/zoispag/valsenv/cmd.version={{.Version}}
+      - -X github.com/zoispag/valsenv/cmd.commit={{.Commit}}
+      - -X github.com/zoispag/valsenv/cmd.date={{.Date}}
     goos:
       - linux
       - darwin

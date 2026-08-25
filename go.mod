@@ -2,7 +2,10 @@ module github.com/zoispag/valsenv
 
 go 1.27.0
 
-require github.com/helmfile/vals v0.46.0
+require (
+	github.com/helmfile/vals v0.46.0
+	github.com/spf13/cobra v1.10.2
+)
 
 require (
 	al.essio.dev/pkg/shellescape v1.6.0 // indirect
@@ -193,7 +196,6 @@ require (
 	github.com/sirupsen/logrus v1.9.4 // indirect
 	github.com/skratchdot/open-golang v0.0.0-20200116055534-eef842397966 // indirect
 	github.com/sony/gobreaker v0.5.0 // indirect
-	github.com/spf13/cobra v1.7.0 // indirect
 	github.com/spf13/pflag v1.0.9 // indirect
 	github.com/spiffe/go-spiffe/v2 v2.8.1 // indirect
 	github.com/tetratelabs/wabin v0.0.0-20230304001439-f6f874872834 // indirect
