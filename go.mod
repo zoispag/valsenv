@@ -2,6 +2,8 @@ module github.com/zoispag/valsenv
 
 go 1.27.0
 
+require github.com/helmfile/vals v0.46.0
+
 require (
 	al.essio.dev/pkg/shellescape v1.6.0 // indirect
 	cel.dev/expr v0.25.2 // indirect
@@ -155,7 +157,6 @@ require (
 	github.com/hashicorp/hcp-sdk-go v0.174.0 // indirect
 	github.com/hashicorp/jsonapi v1.4.3-0.20250220162346-81a76b606f3e // indirect
 	github.com/hashicorp/vault/api v1.23.0 // indirect
-	github.com/helmfile/vals v0.46.0 // indirect
 	github.com/huaweicloud/huaweicloud-sdk-go-v3 v0.1.202 // indirect
 	github.com/ianlancetaylor/demangle v0.0.0-20240805132620-81f5be970eca // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
