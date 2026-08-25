@@ -37,14 +37,23 @@ archives:
 checksum:
   name_template: 'checksums.txt'
 
-# Optional Homebrew tap. Disabled by default because no tap repo exists yet.
-# To enable: create a homebrew-tap repo under `zoispag`, provide a token with
-# repo access, and uncomment the block below.
-# brews:
-#   - name: valsenv
-#     repository:
-#       owner: zoispag
-#       name: homebrew-tap
-#     homepage: 'https://github.com/zoispag/valsenv'
-#     description: 'Render environment values via vals references'
-#     license: 'MIT'
+homebrew_casks:
+  - name: valsenv
+    binaries:
+      - valsenv
+    repository:
+      owner: zoispag
+      name: homebrew-tap
+      token: '{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}'
+    directory: Casks
+    homepage: 'https://github.com/zoispag/valsenv'
+    description: 'Resolve ref+ secret references in dotenv files via helmfile/vals'
+    url:
+      verified: 'github.com/zoispag/valsenv/'
+    # Binaries are not notarized; strip the macOS quarantine attribute on install.
+    hooks:
+      post:
+        install: |
+          if OS.mac?
+            system_command "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "#{staged_path}/valsenv"]
+          end
