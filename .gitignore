@@ -1,0 +1,10 @@
+# Build artifacts
+/valsenv
+/dist/
+
+# Sisyphus planning state (never committed)
+.sisyphus/
+
+# OS / editor cruft
+.DS_Store
+*.swp
