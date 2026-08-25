@@ -2,7 +2,10 @@ package render
 
 import (
 	"bytes"
+	"errors"
+	"fmt"
 	"io"
+	"os"
 	"strconv"
 	"strings"
 
@@ -13,8 +16,10 @@ import (
 // reference through res in a single batch, splices the resolved values back into
 // their exact source lines, and writes the byte-faithful result to w.
 //
-// It is fail-closed: if the resolver errors (or the emit fails), nothing is
-// written to w and the error is returned.
+// It is fail-closed: any guard failure (token pre-check, multiline reject,
+// resolver error, emit failure, or residual-reference scan) returns an error
+// and writes NOTHING to w. Nothing is ever written to w until the full output
+// is buffered and every guard has passed.
 func Render(r io.Reader, w io.Writer, res Resolver) error {
 	// Stage 1: scan into ordered, byte-faithful lines.
 	lines, err := dotenv.Scan(r)
@@ -46,10 +51,30 @@ func Render(r io.Reader, w io.Writer, res Resolver) error {
 		return dotenv.Emit(w, lines)
 	}
 
+	// Guard A (token pre-check, PRE-resolve): if any collected ref targets the
+	// doppler provider but DOPPLER_TOKEN is unset, fail before the resolver runs
+	// so no network call is attempted and no output is written.
+	for _, expr := range refs {
+		if strings.HasPrefix(expr, "ref+doppler://") && os.Getenv("DOPPLER_TOKEN") == "" {
+			return errors.New("DOPPLER_TOKEN is not set but ref+doppler:// references are present")
+		}
+	}
+
 	// Stage 4: resolve in one batch. Fail-closed: on error, write nothing.
 	resolved, err := res.Resolve(refs)
 	if err != nil {
 		return err
+	}
+
+	// Guard B (multiline reject, POST-resolve): a resolved value containing a
+	// raw newline/carriage-return cannot be represented on a single dotenv line.
+	// Both downstream consumers split naively on '\n', so we reject rather than
+	// escape. This fires with a clear per-key message BEFORE any write to w
+	// (the dotenv emitter has its own multiline guard as a second layer).
+	for _, i := range refIdx {
+		if strings.ContainsAny(resolved[strconv.Itoa(i)], "\r\n") {
+			return fmt.Errorf("multiline value unsupported for key %q", lines[i].Key)
+		}
 	}
 
 	// Stage 5: splice resolved values back into their exact lines.
@@ -64,6 +89,44 @@ func Render(r io.Reader, w io.Writer, res Resolver) error {
 	if err := dotenv.Emit(&buf, lines); err != nil {
 		return err
 	}
+
+	// Guard C (residual-ref scan, POST-emit): defense-in-depth for our own
+	// splicing bugs. vals never emits an unresolved ref on success, so this is a
+	// SECONDARY guard, never the only one.
+	//
+	// Scan is line-based, not a naive substring search: we flag only a KeyVal
+	// line whose emitted value STARTS WITH "ref+"/"secretref+", i.e. a reference
+	// that survived resolution. A secret whose value merely CONTAINS "ref+"
+	// mid-value (e.g. "myref+token") is legitimate and must not trip the guard.
+	if err := scanResidualRefs(buf.Bytes()); err != nil {
+		return err
+	}
+
 	_, err = w.Write(buf.Bytes())
 	return err
+}
+
+// scanResidualRefs reports an error if any emitted KeyVal line still carries an
+// unresolved reference, defined precisely as a value that STARTS WITH "ref+" or
+// "secretref+". Comment and non-KeyVal lines are ignored, and refs embedded
+// mid-value are not flagged.
+func scanResidualRefs(out []byte) error {
+	for _, raw := range strings.Split(string(out), "\n") {
+		line := strings.TrimSuffix(raw, "\r")
+		trimmed := strings.TrimLeft(line, " \t")
+		if trimmed == "" || trimmed[0] == '#' {
+			continue
+		}
+		_, val, found := strings.Cut(line, "=")
+		if !found {
+			continue
+		}
+		// The emitter may wrap a value in double quotes; strip one leading quote
+		// so the prefix check sees the value's real first bytes.
+		val = strings.TrimPrefix(val, `"`)
+		if strings.HasPrefix(val, "ref+") || strings.HasPrefix(val, "secretref+") {
+			return fmt.Errorf("residual unresolved reference in output")
+		}
+	}
+	return nil
 }

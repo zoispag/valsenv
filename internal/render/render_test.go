@@ -114,3 +114,95 @@ func TestRenderDuplicateKeys(t *testing.T) {
 		t.Fatalf("duplicate-key mismatch:\n got: %q\nwant: %q", got, want)
 	}
 }
+
+func TestTokenPreCheck(t *testing.T) {
+	t.Setenv("DOPPLER_TOKEN", "")
+	input := "SECRET=ref+doppler://p/c/K\n"
+	res := &fakeRenderResolver{values: map[string]string{}}
+
+	var out bytes.Buffer
+	err := Render(strings.NewReader(input), &out, res)
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if !strings.Contains(err.Error(), "DOPPLER_TOKEN") {
+		t.Fatalf("expected DOPPLER_TOKEN error, got %v", err)
+	}
+	if res.calls != 0 {
+		t.Fatalf("token pre-check must fire before resolver; got %d calls", res.calls)
+	}
+	if out.Len() != 0 {
+		t.Fatalf("expected empty output, got %q", out.String())
+	}
+}
+
+func TestRejectMultiline(t *testing.T) {
+	input := "SECRET=ref+echo://value\n"
+	res := &fakeRenderResolver{values: map[string]string{
+		"ref+echo://value": "line1\nline2",
+	}}
+
+	var out bytes.Buffer
+	err := Render(strings.NewReader(input), &out, res)
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if !strings.Contains(err.Error(), "SECRET") {
+		t.Fatalf("expected error mentioning key SECRET, got %v", err)
+	}
+	if out.Len() != 0 {
+		t.Fatalf("expected empty output on multiline reject, got %q", out.String())
+	}
+}
+
+func TestFailClosedNoPartial(t *testing.T) {
+	input := "SECRET=ref+echo://value\n"
+	res := &fakeRenderResolver{err: errors.New("resolver failed")}
+
+	var out bytes.Buffer
+	err := Render(strings.NewReader(input), &out, res)
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if out.Len() != 0 {
+		t.Fatalf("expected no partial output on resolver error, got %q", out.String())
+	}
+}
+
+func TestResidualRefGuard(t *testing.T) {
+	input := "SECRET=ref+echo://still-a-ref\n"
+	res := &fakeRenderResolver{values: map[string]string{
+		"ref+echo://still-a-ref": "ref+echo://still-a-ref",
+	}}
+
+	var out bytes.Buffer
+	err := Render(strings.NewReader(input), &out, res)
+	if err == nil {
+		t.Fatal("expected error on residual ref, got nil")
+	}
+	if out.Len() != 0 {
+		t.Fatalf("expected empty output when residual ref detected, got %q", out.String())
+	}
+}
+
+// TestInlineCommentAfterRef pins the DEFINED behavior for an inline comment
+// after a ref: the whole trailing text becomes the value, so it does NOT
+// silently succeed with a stripped comment. Here the resolver echoes the value
+// unchanged, so the emitted value still starts with "ref+" and the residual
+// scan catches it (in production vals would instead error on the malformed
+// expression). Either way the render fails closed.
+func TestInlineCommentAfterRef(t *testing.T) {
+	input := "SECRET=ref+echo://x # note\n"
+	res := &fakeRenderResolver{values: map[string]string{
+		"ref+echo://x # note": "ref+echo://x # note",
+	}}
+
+	var out bytes.Buffer
+	err := Render(strings.NewReader(input), &out, res)
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if out.Len() != 0 {
+		t.Fatalf("expected empty output, got %q", out.String())
+	}
+}
