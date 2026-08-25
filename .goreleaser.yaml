@@ -1,0 +1,45 @@
+version: 2
+
+before:
+  hooks:
+    - go mod download
+
+builds:
+  - id: valsenv
+    main: .
+    binary: valsenv
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - darwin
+      - windows
+    goarch:
+      - amd64
+      - arm64
+
+archives:
+  - id: default
+    formats:
+      - tar.gz
+    format_overrides:
+      - goos: windows
+        formats:
+          - zip
+    files:
+      - LICENSE
+
+checksum:
+  name_template: 'checksums.txt'
+
+# Optional Homebrew tap. Disabled by default because no tap repo exists yet.
+# To enable: create a homebrew-tap repo under `zoispag`, provide a token with
+# repo access, and uncomment the block below.
+# brews:
+#   - name: valsenv
+#     repository:
+#       owner: zoispag
+#       name: homebrew-tap
+#     homepage: 'https://github.com/zoispag/valsenv'
+#     description: 'Render environment values via vals references'
+#     license: 'MIT'
