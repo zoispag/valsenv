@@ -1,3 +1,7 @@
+<p align="center">
+  <img src=".github/assets/valsenv.png" alt="valsenv — seamless secret injection for environment variables, powered by helmfile/vals" width="100%">
+</p>
+
 # valsenv
 
 `valsenv` resolves `ref+<backend>://` references inside dotenv (`.env`) files using [helmfile/vals](https://github.com/helmfile/vals). vals's own `eval`/`exec`/`env` commands only accept YAML/JSON, so `valsenv` fills the dotenv gap.
