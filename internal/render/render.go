@@ -2,10 +2,8 @@ package render
 
 import (
 	"bytes"
-	"errors"
 	"fmt"
 	"io"
-	"os"
 	"strconv"
 	"strings"
 
@@ -16,10 +14,11 @@ import (
 // reference through res in a single batch, splices the resolved values back into
 // their exact source lines, and writes the byte-faithful result to w.
 //
-// It is fail-closed: any guard failure (token pre-check, multiline reject,
-// resolver error, emit failure, or residual-reference scan) returns an error
-// and writes NOTHING to w. Nothing is ever written to w until the full output
-// is buffered and every guard has passed.
+// It is fail-closed: any failure (multiline reject, resolver error, emit
+// failure, or residual-reference scan) returns an error and writes NOTHING to
+// w. Nothing is ever written to w until the full output is buffered and every
+// guard has passed. Per-backend credentials are the resolver's concern: vals
+// surfaces its own auth errors uniformly, which Render propagates unchanged.
 func Render(r io.Reader, w io.Writer, res Resolver) error {
 	// Stage 1: scan into ordered, byte-faithful lines.
 	lines, err := dotenv.Scan(r)
@@ -49,15 +48,6 @@ func Render(r io.Reader, w io.Writer, res Resolver) error {
 	// Stage 3: no refs -> emit unchanged and return without invoking the resolver.
 	if len(refs) == 0 {
 		return dotenv.Emit(w, lines)
-	}
-
-	// Guard A (token pre-check, PRE-resolve): if any collected ref targets the
-	// doppler provider but DOPPLER_TOKEN is unset, fail before the resolver runs
-	// so no network call is attempted and no output is written.
-	for _, expr := range refs {
-		if strings.HasPrefix(expr, "ref+doppler://") && os.Getenv("DOPPLER_TOKEN") == "" {
-			return errors.New("DOPPLER_TOKEN is not set but ref+doppler:// references are present")
-		}
 	}
 
 	// Stage 4: resolve in one batch. Fail-closed: on error, write nothing.

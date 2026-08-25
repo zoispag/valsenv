@@ -115,27 +115,6 @@ func TestRenderDuplicateKeys(t *testing.T) {
 	}
 }
 
-func TestTokenPreCheck(t *testing.T) {
-	t.Setenv("DOPPLER_TOKEN", "")
-	input := "SECRET=ref+doppler://p/c/K\n"
-	res := &fakeRenderResolver{values: map[string]string{}}
-
-	var out bytes.Buffer
-	err := Render(strings.NewReader(input), &out, res)
-	if err == nil {
-		t.Fatal("expected error, got nil")
-	}
-	if !strings.Contains(err.Error(), "DOPPLER_TOKEN") {
-		t.Fatalf("expected DOPPLER_TOKEN error, got %v", err)
-	}
-	if res.calls != 0 {
-		t.Fatalf("token pre-check must fire before resolver; got %d calls", res.calls)
-	}
-	if out.Len() != 0 {
-		t.Fatalf("expected empty output, got %q", out.String())
-	}
-}
-
 func TestRejectMultiline(t *testing.T) {
 	input := "SECRET=ref+echo://value\n"
 	res := &fakeRenderResolver{values: map[string]string{

@@ -61,7 +61,7 @@ T=UTC
 
 Resolution is handled by [vals](https://github.com/helmfile/vals), which supports a wide range of backends: Doppler, Vault, AWS Secrets Manager, GCP Secret Manager, 1Password, SOPS, and more. See the vals documentation for the full list and reference syntax.
 
-The Doppler backend reads `DOPPLER_TOKEN` from the environment.
+Each backend reads its own credentials from the environment or standard credential sources (config files, instance metadata, ADC, and the like) — see the vals documentation for per-backend configuration.
 
 ## Behavior & limitations
 
