@@ -39,9 +39,9 @@ func Render(r io.Reader, w io.Writer, res Resolver) error {
 		if l.Kind != dotenv.KindKeyVal {
 			continue
 		}
-		if strings.HasPrefix(l.Value, "ref+") || strings.HasPrefix(l.Value, "secretref+") {
+		if expr, ok := refExpression(l.Value); ok {
 			refIdx = append(refIdx, i)
-			refs[strconv.Itoa(i)] = l.Value
+			refs[strconv.Itoa(i)] = expr
 		}
 	}
 
@@ -94,6 +94,22 @@ func Render(r io.Reader, w io.Writer, res Resolver) error {
 
 	_, err = w.Write(buf.Bytes())
 	return err
+}
+
+// refExpression returns the bare ref expression and true if rawValue is a
+// full-value ref, tolerating a single matching pair of surrounding double or
+// single quotes. The unquoted expression is what gets sent to vals.
+func refExpression(rawValue string) (string, bool) {
+	v := rawValue
+	if len(v) >= 2 {
+		if (v[0] == '"' && v[len(v)-1] == '"') || (v[0] == '\'' && v[len(v)-1] == '\'') {
+			v = v[1 : len(v)-1]
+		}
+	}
+	if strings.HasPrefix(v, "ref+") || strings.HasPrefix(v, "secretref+") {
+		return v, true
+	}
+	return "", false
 }
 
 // scanResidualRefs reports an error if any emitted KeyVal line still carries an

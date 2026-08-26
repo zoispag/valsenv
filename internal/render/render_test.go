@@ -8,15 +8,22 @@ import (
 )
 
 type fakeRenderResolver struct {
-	values map[string]string
-	err    error
-	calls  int
-	lastN  int
+	values   map[string]string
+	err      error
+	calls    int
+	lastN    int
+	received map[string]struct{}
 }
 
 func (f *fakeRenderResolver) Resolve(refs map[string]string) (map[string]string, error) {
 	f.calls++
 	f.lastN = len(refs)
+	if f.received == nil {
+		f.received = make(map[string]struct{})
+	}
+	for _, expr := range refs {
+		f.received[expr] = struct{}{}
+	}
 	if f.err != nil {
 		return nil, f.err
 	}
@@ -161,6 +168,77 @@ func TestResidualRefGuard(t *testing.T) {
 	}
 	if out.Len() != 0 {
 		t.Fatalf("expected empty output when residual ref detected, got %q", out.String())
+	}
+}
+
+func TestRenderQuotedRefs(t *testing.T) {
+	cases := []struct {
+		name          string
+		input         string
+		values        map[string]string
+		want          string
+		wantExprs     []string
+		wantNoResolve bool
+	}{
+		{
+			name:      "unquoted ref",
+			input:     "A=ref+echo://x\n",
+			values:    map[string]string{"ref+echo://x": "aval"},
+			want:      "A=aval\n",
+			wantExprs: []string{"ref+echo://x"},
+		},
+		{
+			name:      "double-quoted ref",
+			input:     "B=\"ref+echo://x\"\n",
+			values:    map[string]string{"ref+echo://x": "bval"},
+			want:      "B=bval\n",
+			wantExprs: []string{"ref+echo://x"},
+		},
+		{
+			name:      "single-quoted ref",
+			input:     "C='ref+echo://x'\n",
+			values:    map[string]string{"ref+echo://x": "cval"},
+			want:      "C=cval\n",
+			wantExprs: []string{"ref+echo://x"},
+		},
+		{
+			name:          "non-ref double-quoted verbatim",
+			input:         "D=\"plain\"\n",
+			values:        map[string]string{},
+			want:          "D=\"plain\"\n",
+			wantNoResolve: true,
+		},
+		{
+			name:          "half-quoted literal",
+			input:         "E=\"ref+echo://x\n",
+			values:        map[string]string{},
+			want:          "E=\"ref+echo://x\n",
+			wantNoResolve: true,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			res := &fakeRenderResolver{values: tc.values}
+			var out bytes.Buffer
+			if err := Render(strings.NewReader(tc.input), &out, res); err != nil {
+				t.Fatalf("Render returned error: %v", err)
+			}
+			if got := out.String(); got != tc.want {
+				t.Fatalf("output mismatch:\n got: %q\nwant: %q", got, tc.want)
+			}
+			if tc.wantNoResolve {
+				if res.calls != 0 {
+					t.Fatalf("expected resolver not invoked, got %d calls", res.calls)
+				}
+				return
+			}
+			for _, want := range tc.wantExprs {
+				if _, ok := res.received[want]; !ok {
+					t.Fatalf("resolver did not receive expr %q; received %v", want, res.received)
+				}
+			}
+		})
 	}
 }
 
