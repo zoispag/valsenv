@@ -56,7 +56,7 @@ func TestEmitVerbatim(t *testing.T) {
 		t.Fatalf("Scan: %v", err)
 	}
 	var b bytes.Buffer
-	if err := Emit(&b, lines); err != nil {
+	if err := Emit(&b, lines, QuoteMinimal); err != nil {
 		t.Fatalf("Emit: %v", err)
 	}
 	if got := b.String(); got != in {
@@ -77,7 +77,7 @@ func TestEmitQuotingRoundTrip(t *testing.T) {
 	t.Run("specials", func(t *testing.T) {
 		lines := []Line{{Kind: KindKeyVal, Key: "KEY", Value: `a b"c`, Resolved: true, Ending: "\n"}}
 		var b bytes.Buffer
-		if err := Emit(&b, lines); err != nil {
+		if err := Emit(&b, lines, QuoteMinimal); err != nil {
 			t.Fatalf("Emit: %v", err)
 		}
 		_, v := naiveParse(strings.TrimRight(b.String(), "\n"))
@@ -89,7 +89,7 @@ func TestEmitQuotingRoundTrip(t *testing.T) {
 	t.Run("empty", func(t *testing.T) {
 		lines := []Line{{Kind: KindKeyVal, Key: "KEY", Value: "", Resolved: true, Ending: "\n"}}
 		var b bytes.Buffer
-		if err := Emit(&b, lines); err != nil {
+		if err := Emit(&b, lines, QuoteMinimal); err != nil {
 			t.Fatalf("Emit: %v", err)
 		}
 		if got := b.String(); got != "KEY=\n" {
@@ -100,7 +100,7 @@ func TestEmitQuotingRoundTrip(t *testing.T) {
 	t.Run("plain", func(t *testing.T) {
 		lines := []Line{{Kind: KindKeyVal, Key: "KEY", Value: "hello", Resolved: true, Ending: "\n"}}
 		var b bytes.Buffer
-		if err := Emit(&b, lines); err != nil {
+		if err := Emit(&b, lines, QuoteMinimal); err != nil {
 			t.Fatalf("Emit: %v", err)
 		}
 		if got := b.String(); got != "KEY=hello\n" {
@@ -112,7 +112,7 @@ func TestEmitQuotingRoundTrip(t *testing.T) {
 func TestEmitRejectsMultiline(t *testing.T) {
 	lines := []Line{{Kind: KindKeyVal, Key: "KEY", Value: "a\nb", Resolved: true, Ending: "\n"}}
 	var b bytes.Buffer
-	if err := Emit(&b, lines); err == nil {
+	if err := Emit(&b, lines, QuoteMinimal); err == nil {
 		t.Fatal("Emit: want error for multiline resolved value, got nil")
 	}
 }

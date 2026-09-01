@@ -158,6 +158,51 @@ func TestRenderResolverFailure(t *testing.T) {
 	}
 }
 
+func TestRenderQuoteShell(t *testing.T) {
+	var out, errOut bytes.Buffer
+	in := strings.NewReader("S=ref+echo://a;b\n")
+
+	code := executeWithCode([]string{"render", "--quote=shell"}, in, &out, &errOut)
+
+	if code != 0 {
+		t.Fatalf("exit = %d, want 0; stderr=%q", code, errOut.String())
+	}
+	if got := out.String(); got != "S='a;b'\n" {
+		t.Errorf("stdout = %q, want %q", got, "S='a;b'\n")
+	}
+}
+
+func TestRenderQuoteMinimalDefault(t *testing.T) {
+	var out, errOut bytes.Buffer
+	in := strings.NewReader("S=ref+echo://a;b\n")
+
+	code := executeWithCode([]string{"render"}, in, &out, &errOut)
+
+	if code != 0 {
+		t.Fatalf("exit = %d, want 0; stderr=%q", code, errOut.String())
+	}
+	if got := out.String(); got != "S=a;b\n" {
+		t.Errorf("stdout = %q, want %q (default must be minimal)", got, "S=a;b\n")
+	}
+}
+
+func TestRenderQuoteInvalid(t *testing.T) {
+	var out, errOut bytes.Buffer
+	in := strings.NewReader("S=ref+echo://x\n")
+
+	code := executeWithCode([]string{"render", "--quote=bogus"}, in, &out, &errOut)
+
+	if code != 2 {
+		t.Fatalf("exit = %d, want 2", code)
+	}
+	if out.Len() != 0 {
+		t.Errorf("stdout = %q, want empty", out.String())
+	}
+	if errOut.Len() == 0 {
+		t.Error("stderr empty, want error")
+	}
+}
+
 func TestRenderOutputUntouchedOnFailure(t *testing.T) {
 	withResolver(t, failResolver{})
 	var out, errOut bytes.Buffer

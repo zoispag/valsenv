@@ -19,7 +19,10 @@ import (
 // w. Nothing is ever written to w until the full output is buffered and every
 // guard has passed. Per-backend credentials are the resolver's concern: vals
 // surfaces its own auth errors uniformly, which Render propagates unchanged.
-func Render(r io.Reader, w io.Writer, res Resolver) error {
+//
+// style selects how resolved values are quoted: dotenv.QuoteMinimal preserves
+// the default byte-faithful output, dotenv.QuoteShell emits source-safe output.
+func Render(r io.Reader, w io.Writer, res Resolver, style dotenv.QuoteStyle) error {
 	// Stage 1: scan into ordered, byte-faithful lines.
 	lines, err := dotenv.Scan(r)
 	if err != nil {
@@ -47,7 +50,7 @@ func Render(r io.Reader, w io.Writer, res Resolver) error {
 
 	// Stage 3: no refs -> emit unchanged and return without invoking the resolver.
 	if len(refs) == 0 {
-		return dotenv.Emit(w, lines)
+		return dotenv.Emit(w, lines, style)
 	}
 
 	// Stage 4: resolve in one batch. Fail-closed: on error, write nothing.
@@ -76,7 +79,7 @@ func Render(r io.Reader, w io.Writer, res Resolver) error {
 	// Stage 6: buffer the emit; only write to w once the full output is ready,
 	// so an emit error never leaves partial output on w.
 	var buf bytes.Buffer
-	if err := dotenv.Emit(&buf, lines); err != nil {
+	if err := dotenv.Emit(&buf, lines, style); err != nil {
 		return err
 	}
 

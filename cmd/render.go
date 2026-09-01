@@ -2,25 +2,38 @@ package cmd
 
 import (
 	"bytes"
+	"fmt"
 	"os"
 	"path/filepath"
 
 	"github.com/spf13/cobra"
 
+	"github.com/zoispag/valsenv/internal/dotenv"
 	"github.com/zoispag/valsenv/internal/render"
 )
+
+// quoteStyles maps the --quote flag values to their dotenv.QuoteStyle.
+var quoteStyles = map[string]dotenv.QuoteStyle{
+	"minimal": dotenv.QuoteMinimal,
+	"shell":   dotenv.QuoteShell,
+}
 
 // newResolver is a seam so tests can inject a failing resolver; production uses
 // the real vals-backed resolver.
 var newResolver = func() (render.Resolver, error) { return render.NewValsResolver() }
 
 func newRenderCmd() *cobra.Command {
-	var inPath, outPath string
+	var inPath, outPath, quoteMode string
 	cmd := &cobra.Command{
 		Use:   "render",
 		Short: "Render a dotenv stream, resolving vals ref+ references",
 		Args:  cobra.NoArgs,
 		RunE: func(c *cobra.Command, _ []string) error {
+			style, ok := quoteStyles[quoteMode]
+			if !ok {
+				return &exitError{2, fmt.Errorf("invalid --quote value %q (want \"minimal\" or \"shell\")", quoteMode)}
+			}
+
 			in := c.InOrStdin()
 			if inPath != "" {
 				f, err := os.Open(inPath)
@@ -39,7 +52,7 @@ func newRenderCmd() *cobra.Command {
 			// Buffer the full render before writing anything, so failures leave
 			// stdout empty and any -o target untouched (fail-closed, atomic).
 			var buf bytes.Buffer
-			if err := render.Render(in, &buf, res); err != nil {
+			if err := render.Render(in, &buf, res, style); err != nil {
 				return &exitError{1, err}
 			}
 
@@ -57,6 +70,7 @@ func newRenderCmd() *cobra.Command {
 	}
 	cmd.Flags().StringVarP(&inPath, "file", "f", "", "input dotenv file (default: stdin)")
 	cmd.Flags().StringVarP(&outPath, "output", "o", "", "output file (default: stdout)")
+	cmd.Flags().StringVar(&quoteMode, "quote", "minimal", "quoting mode: minimal (byte-faithful) or shell (safe for POSIX source)")
 	return cmd
 }
 
