@@ -5,6 +5,8 @@ import (
 	"errors"
 	"strings"
 	"testing"
+
+	"github.com/zoispag/valsenv/internal/dotenv"
 )
 
 type fakeRenderResolver struct {
@@ -42,7 +44,7 @@ func TestRenderMixedFile(t *testing.T) {
 	}}
 
 	var out bytes.Buffer
-	if err := Render(strings.NewReader(input), &out, res); err != nil {
+	if err := Render(strings.NewReader(input), &out, res, dotenv.QuoteMinimal); err != nil {
 		t.Fatalf("Render returned error: %v", err)
 	}
 
@@ -61,7 +63,7 @@ func TestRenderBatched(t *testing.T) {
 	}}
 
 	var out bytes.Buffer
-	if err := Render(strings.NewReader(input), &out, res); err != nil {
+	if err := Render(strings.NewReader(input), &out, res, dotenv.QuoteMinimal); err != nil {
 		t.Fatalf("Render returned error: %v", err)
 	}
 
@@ -78,7 +80,7 @@ func TestRenderNoRefs(t *testing.T) {
 	res := &fakeRenderResolver{values: map[string]string{}}
 
 	var out bytes.Buffer
-	if err := Render(strings.NewReader(input), &out, res); err != nil {
+	if err := Render(strings.NewReader(input), &out, res, dotenv.QuoteMinimal); err != nil {
 		t.Fatalf("Render returned error: %v", err)
 	}
 
@@ -95,7 +97,7 @@ func TestRenderResolverErrorNoOutput(t *testing.T) {
 	res := &fakeRenderResolver{err: errors.New("boom")}
 
 	var out bytes.Buffer
-	err := Render(strings.NewReader(input), &out, res)
+	err := Render(strings.NewReader(input), &out, res, dotenv.QuoteMinimal)
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}
@@ -112,7 +114,7 @@ func TestRenderDuplicateKeys(t *testing.T) {
 	}}
 
 	var out bytes.Buffer
-	if err := Render(strings.NewReader(input), &out, res); err != nil {
+	if err := Render(strings.NewReader(input), &out, res, dotenv.QuoteMinimal); err != nil {
 		t.Fatalf("Render returned error: %v", err)
 	}
 
@@ -129,7 +131,7 @@ func TestRejectMultiline(t *testing.T) {
 	}}
 
 	var out bytes.Buffer
-	err := Render(strings.NewReader(input), &out, res)
+	err := Render(strings.NewReader(input), &out, res, dotenv.QuoteMinimal)
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}
@@ -146,7 +148,7 @@ func TestFailClosedNoPartial(t *testing.T) {
 	res := &fakeRenderResolver{err: errors.New("resolver failed")}
 
 	var out bytes.Buffer
-	err := Render(strings.NewReader(input), &out, res)
+	err := Render(strings.NewReader(input), &out, res, dotenv.QuoteMinimal)
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}
@@ -162,7 +164,7 @@ func TestResidualRefGuard(t *testing.T) {
 	}}
 
 	var out bytes.Buffer
-	err := Render(strings.NewReader(input), &out, res)
+	err := Render(strings.NewReader(input), &out, res, dotenv.QuoteMinimal)
 	if err == nil {
 		t.Fatal("expected error on residual ref, got nil")
 	}
@@ -221,7 +223,7 @@ func TestRenderQuotedRefs(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			res := &fakeRenderResolver{values: tc.values}
 			var out bytes.Buffer
-			if err := Render(strings.NewReader(tc.input), &out, res); err != nil {
+			if err := Render(strings.NewReader(tc.input), &out, res, dotenv.QuoteMinimal); err != nil {
 				t.Fatalf("Render returned error: %v", err)
 			}
 			if got := out.String(); got != tc.want {
@@ -242,6 +244,63 @@ func TestRenderQuotedRefs(t *testing.T) {
 	}
 }
 
+func TestRenderShellQuotesResolvedValue(t *testing.T) {
+	input := "SECRET=ref+echo://x\nPLAIN=literal\n"
+	res := &fakeRenderResolver{values: map[string]string{
+		"ref+echo://x": "a;b$c",
+	}}
+
+	var out bytes.Buffer
+	if err := Render(strings.NewReader(input), &out, res, dotenv.QuoteShell); err != nil {
+		t.Fatalf("Render returned error: %v", err)
+	}
+
+	want := "SECRET='a;b$c'\nPLAIN=literal\n"
+	if got := out.String(); got != want {
+		t.Fatalf("shell output mismatch:\n got: %q\nwant: %q", got, want)
+	}
+}
+
+// TestRenderMinimalRegression guards the default: minimal output for a
+// representative file must stay byte-identical to the pre-change behavior.
+func TestRenderMinimalRegression(t *testing.T) {
+	input := "# comment\nA=ref+echo://plain\nB=ref+echo://spacey\nC=ref+echo://hashy\nD=literal\n"
+	res := &fakeRenderResolver{values: map[string]string{
+		"ref+echo://plain":  "plainValue123",
+		"ref+echo://spacey": "a b",
+		"ref+echo://hashy":  "a#b",
+	}}
+
+	var out bytes.Buffer
+	if err := Render(strings.NewReader(input), &out, res, dotenv.QuoteMinimal); err != nil {
+		t.Fatalf("Render returned error: %v", err)
+	}
+
+	want := "# comment\nA=plainValue123\nB=\"a b\"\nC=\"a#b\"\nD=literal\n"
+	if got := out.String(); got != want {
+		t.Fatalf("minimal regression mismatch:\n got: %q\nwant: %q", got, want)
+	}
+}
+
+func TestRenderShellRejectsMultiline(t *testing.T) {
+	input := "SECRET=ref+echo://value\n"
+	res := &fakeRenderResolver{values: map[string]string{
+		"ref+echo://value": "line1\nline2",
+	}}
+
+	var out bytes.Buffer
+	err := Render(strings.NewReader(input), &out, res, dotenv.QuoteShell)
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if !strings.Contains(err.Error(), "SECRET") {
+		t.Fatalf("expected error mentioning key SECRET, got %v", err)
+	}
+	if out.Len() != 0 {
+		t.Fatalf("expected empty output on multiline reject, got %q", out.String())
+	}
+}
+
 // TestInlineCommentAfterRef pins the DEFINED behavior for an inline comment
 // after a ref: the whole trailing text becomes the value, so it does NOT
 // silently succeed with a stripped comment. Here the resolver echoes the value
@@ -255,7 +314,7 @@ func TestInlineCommentAfterRef(t *testing.T) {
 	}}
 
 	var out bytes.Buffer
-	err := Render(strings.NewReader(input), &out, res)
+	err := Render(strings.NewReader(input), &out, res, dotenv.QuoteMinimal)
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}

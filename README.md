@@ -21,11 +21,12 @@ Prebuilt binaries are also published on the [GitHub Releases](https://github.com
 ## Usage
 
 ```
-valsenv render [-f file] [-o file]
+valsenv render [-f file] [-o file] [--quote minimal|shell]
 ```
 
 - `-f file`: input dotenv file. When omitted, `valsenv` reads from stdin.
 - `-o file`: output file. When omitted, `valsenv` writes to stdout.
+- `--quote minimal|shell`: quoting mode for resolved values (default `minimal`, byte-faithful). Use `shell` for `.env` files consumed via POSIX `source`/`.`, which single-quotes values so shell metacharacters (`;`, `$`, `` ` ``, spaces, …) are never expanded or split.
 
 Example:
 
