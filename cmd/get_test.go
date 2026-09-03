@@ -136,6 +136,19 @@ func TestGetMultiRefInputRejected(t *testing.T) {
 	}
 }
 
+func TestGetNonAsciiWhitespaceRejected(t *testing.T) {
+	var out, errOut bytes.Buffer
+
+	code := executeWithCode([]string{"get", "ref+echo://a\vref+echo://b"}, strings.NewReader(""), &out, &errOut)
+
+	if code != 1 {
+		t.Fatalf("exit = %d, want 1", code)
+	}
+	if out.Len() != 0 {
+		t.Errorf("stdout = %q, want empty", out.String())
+	}
+}
+
 func TestGetEmptyInput(t *testing.T) {
 	var out, errOut bytes.Buffer
 

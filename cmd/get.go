@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"strings"
+	"unicode"
 
 	"github.com/spf13/cobra"
 )
@@ -56,7 +57,7 @@ added or removed.`,
 			if !strings.HasPrefix(expr, "ref+") && !strings.HasPrefix(expr, "secretref+") {
 				return &exitError{1, fmt.Errorf("input is not a ref+/secretref+ reference")}
 			}
-			if strings.ContainsAny(expr, " \t\r\n") {
+			if strings.IndexFunc(expr, unicode.IsSpace) >= 0 {
 				return &exitError{1, fmt.Errorf("input must be a single reference")}
 			}
 
