@@ -43,9 +43,10 @@ func newRootCmd() *cobra.Command {
 	root.SetFlagErrorFunc(func(c *cobra.Command, err error) error {
 		return &exitError{2, err}
 	})
-	// Only render and version are supported; drop cobra's default completion cmd.
+	// Only render, get and version are supported; drop cobra's default completion cmd.
 	root.CompletionOptions.DisableDefaultCmd = true
 	root.AddCommand(newRenderCmd())
+	root.AddCommand(newGetCmd())
 	root.AddCommand(newVersionCmd())
 	return root
 }

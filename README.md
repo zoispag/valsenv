@@ -56,6 +56,29 @@ A=hello
 T=UTC
 ```
 
+### Raw file secrets: `valsenv get`
+
+Some secrets are not environment variables at all — SSH private keys, PEM certificates, kubeconfigs. For those, `get` resolves a single reference and outputs the raw value, multiline included:
+
+```
+valsenv get [REF] [-f file] [-o file]
+```
+
+- `REF`: the reference as an argument, e.g. `ref+doppler://PROJECT/CONFIG/SSH_KEY`.
+- `-f file`: read the reference from a file whose entire (whitespace-trimmed) content is one reference. When both `REF` and `-f` are omitted, reads from stdin.
+- `-o file`: output file. When omitted, writes to stdout.
+
+Unlike `render`, there are no dotenv semantics: no quoting, and the value is written exactly as the backend returns it (no trailing newline added or removed).
+
+Example — commit a placeholder file containing only the ref, then resolve it in place:
+
+```
+# deploy_ssh_key (in git)
+ref+doppler://PROJECT/CONFIG/DEPLOY_SSH_KEY
+
+valsenv get -f deploy_ssh_key -o deploy_ssh_key
+```
+
 ## Exit codes
 
 - `0`: success.
@@ -72,7 +95,7 @@ Each backend reads its own credentials from the environment or standard credenti
 
 - Comments, blank lines, and key order are preserved.
 - Only values that are a complete `ref+` or `secretref+` reference are resolved. Plain values and embedded refs are left alone.
-- Multiline resolved values are rejected in v1. Simple dotenv consumers split on newlines, so a secret containing a newline would corrupt the file.
+- `render` rejects multiline resolved values. Simple dotenv consumers split on newlines, so a secret containing a newline would corrupt the file. Use `get` for multiline secrets that live in their own file.
 - A trailing inline comment after a ref value is not supported.
 
 ## License
