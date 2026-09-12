@@ -48,9 +48,13 @@ homebrew_casks:
     directory: Casks
     homepage: 'https://github.com/zoispag/valsenv'
     description: 'Resolve ref+ secret references in dotenv files via helmfile/vals'
-    url:
-      verified: 'github.com/zoispag/valsenv/'
     # Binaries are not notarized; strip the macOS quarantine attribute on install.
+    # TODO: Homebrew deprecated the `postflight` stanza this hook renders to.
+    # Once GoReleaser v2.19 ships (goreleaser/goreleaser#6873), switch to
+    # `hooks.post.install_steps` with:
+    #   on_macos do
+    #     run "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "{{ .StagedPath }}/valsenv"]
+    #   end
     hooks:
       post:
         install: |
